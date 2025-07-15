@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content提取器</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .input-section {
+            margin-bottom: 30px;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 150px;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            resize: vertical;
+            transition: border-color 0.3s ease;
+            box-sizing: border-box;
+        }
+        
+        textarea:focus {
+            border-color: #667eea;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .button-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        button {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        .result-section {
+            margin-top: 30px;
+        }
+        
+        .result-box {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 400px;
+            overflow-y: auto;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .stats {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+        }
+        
+        .stat-item {
+            flex: 1;
+        }
+        
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            display: block;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.8;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .copy-button {
+            background: #28a745;
+            margin-top: 10px;
+            padding: 8px 20px;
+            font-size: 14px;
+        }
+        
+        .copy-button:hover {
+            background: #218838;
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Content 提取器</h1>
+        
+        <div class="input-section">
+            <label for="inputData" style="display: block; margin-bottom: 10px; font-weight: bold; color: #2c3e50;">输入数据流：</label>
+            <textarea id="inputData" placeholder="在此粘贴包含content字段的数据流..."></textarea>
+        </div>
+        
+        <div class="button-container">
+            <button onclick="extractContent()">提取并拼接内容</button>
+            <button onclick="loadSampleData()" style="background: #6c757d; margin-left: 10px;">加载示例数据</button>
+        </div>
+        
+        <div class="result-section">
+            <div id="stats" class="stats" style="display: none;">
+                <div class="stat-item">
+                    <span class="stat-number" id="totalLines">0</span>
+                    <span class="stat-label">总行数</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" id="contentLines">0</span>
+                    <span class="stat-label">内容行数</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" id="totalChars">0</span>
+                    <span class="stat-label">总字符数</span>
+                </div>
+            </div>
+            
+            <div id="result" class="result-box" style="display: none;"></div>
+            <div style="text-align: center;">
+                <button id="copyButton" class="copy-button" onclick="copyToClipboard()" style="display: none;">📋 复制结果</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let extractedContent = '';
+        
+        function extractContent() {
+            const inputData = document.getElementById('inputData').value.trim();
+            
+            if (!inputData) {
+                showError('请输入数据流！');
+                return;
+            }
+            
+            try {
+                const lines = inputData.split('\n');
+                const contentParts = [];
+                let totalLines = lines.length;
+                let contentLines = 0;
+                
+                for (const line of lines) {
+                    if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+                        try {
+                            const jsonStr = line.substring(6); // 移除 'data: ' 前缀
+                            const jsonData = JSON.parse(jsonStr);
+                            
+                            if (jsonData.choices && jsonData.choices[0] && jsonData.choices[0].delta && jsonData.choices[0].delta.content) {
+                                const content = jsonData.choices[0].delta.content;
+                                contentParts.push(content);
+                                contentLines++;
+                            }
+                        } catch (e) {
+                            // 忽略解析错误的行
+                            console.warn('解析行时出错:', line);
+                        }
+                    }
+                }
+                
+                if (contentParts.length === 0) {
+                    showError('未找到任何content内容！');
+                    return;
+                }
+                
+                extractedContent = contentParts.join('');
+                
+                // 显示统计信息
+                document.getElementById('totalLines').textContent = totalLines;
+                document.getElementById('contentLines').textContent = contentLines;
+                document.getElementById('totalChars').textContent = extractedContent.length;
+                document.getElementById('stats').style.display = 'flex';
+                
+                // 显示结果
+                document.getElementById('result').textContent = extractedContent;
+                document.getElementById('result').style.display = 'block';
+                document.getElementById('copyButton').style.display = 'inline-block';
+                
+                // 清除之前的错误信息
+                const errorElement = document.querySelector('.error');
+                if (errorElement) {
+                    errorElement.remove();
+                }
+                
+            } catch (error) {
+                showError('处理数据时出错: ' + error.message);
+            }
+        }
+        
+        function loadSampleData() {
+            const sampleData = window.fs ? '' : `data: {"choices":[{"index":0,"delta":{"content":"\\u003cthinking","role":"assistant"}}],"created":1752543355,"id":"msg_01F77ki7nLQKHyu2Tjt82dgc","model":"claude-sonnet-4"}
+
+data: {"choices":[{"index":0,"delta":{"content":"\\u003e\\n用户要求计算828392+","role":"assistant"}}],"created":1752543355,"id":"msg_01F77ki7nLQKHyu2Tjt82dgc","model":"claude-sonnet-4"}
+
+data: {"choices":[{"index":0,"delta":{"content":"8939293的结果。我看","role":"assistant"}}],"created":1752543355,"id":"msg_01F77ki7nLQKHyu2Tjt82dgc","model":"claude-sonnet-4"}
+
+data: {"choices":[{"index":0,"delta":{"content":"到在连接的MCP服务器中","role":"assistant"}}],"created":1752543355,"id":"msg_01F77ki7nLQKHyu2Tjt82dgc","model":"claude-sonnet-4"}
+
+data: [DONE]`;
+            
+            if (window.fs) {
+                // 读取用户上传的文件
+                loadFileContent();
+            } else {
+                document.getElementById('inputData').value = sampleData;
+            }
+        }
+        
+        async function loadFileContent() {
+            try {
+                const content = await window.fs.readFile('paste.txt', { encoding: 'utf8' });
+                document.getElementById('inputData').value = content;
+            } catch (error) {
+                showError('读取文件失败: ' + error.message);
+            }
+        }
+        
+        function copyToClipboard() {
+            navigator.clipboard.writeText(extractedContent).then(() => {
+                showSuccess('内容已复制到剪贴板！');
+            }).catch(err => {
+                showError('复制失败: ' + err.message);
+            });
+        }
+        
+        function showError(message) {
+            const existingError = document.querySelector('.error');
+            if (existingError) {
+                existingError.remove();
+            }
+            
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.textContent = message;
+            document.querySelector('.result-section').appendChild(errorDiv);
+        }
+        
+        function showSuccess(message) {
+            const existingSuccess = document.querySelector('.success');
+            if (existingSuccess) {
+                existingSuccess.remove();
+            }
+            
+            const successDiv = document.createElement('div');
+            successDiv.className = 'success';
+            successDiv.textContent = message;
+            document.querySelector('.result-section').appendChild(successDiv);
+            
+            setTimeout(() => {
+                successDiv.remove();
+            }, 3000);
+        }
+        
+        // 如果检测到文件系统API，自动加载文件内容
+        if (window.fs) {
+            loadFileContent();
+        }
+    </script>
+</body>
+</html>
