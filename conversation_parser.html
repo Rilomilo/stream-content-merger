@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>对话数据解析器</title>
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs/loader.js"></script>
     <style>
         * {
             margin: 0;
@@ -47,6 +48,92 @@
 
         .main-content {
             padding: 30px;
+            display: flex;
+            gap: 30px;
+        }
+
+        .sidebar {
+            width: 250px;
+            flex-shrink: 0;
+            background: #f9fafb;
+            border-radius: 12px;
+            padding: 20px;
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+            display: none;
+        }
+
+        .sidebar.visible {
+            display: block;
+        }
+
+        .sidebar-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .outline-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .outline-item {
+            margin-bottom: 8px;
+        }
+
+        .outline-link {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            text-decoration: none;
+            color: #6b7280;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .outline-link:hover {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .outline-link.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .outline-number {
+            background: #e5e7eb;
+            color: #6b7280;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-right: 8px;
+            min-width: 20px;
+            text-align: center;
+        }
+
+        .outline-link.active .outline-number {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+
+        .outline-role {
+            flex: 1;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .content-area {
+            flex: 1;
+            min-width: 0;
         }
 
         .input-section {
@@ -129,7 +216,7 @@
         }
 
         .message-list {
-            space-y: 20px;
+            /* Styles will be applied via individual message classes */
         }
 
         .message {
@@ -200,6 +287,14 @@
             color: #374151;
             white-space: pre-wrap;
             word-wrap: break-word;
+        }
+
+        .message-editor {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-top: 10px;
+            min-height: 100px;
         }
 
         .tool-calls {
@@ -319,7 +414,15 @@
         </div>
 
         <div class="main-content">
-            <div class="input-section">
+            <div class="sidebar" id="sidebar">
+                <div class="sidebar-title">对话大纲</div>
+                <ul class="outline-list" id="outlineList">
+                    <!-- Outline items will be dynamically generated -->
+                </ul>
+            </div>
+
+            <div class="content-area">
+                <div class="input-section">
                 <label class="input-label" for="conversationInput">
                     对话数据 (JSON格式)
                 </label>
@@ -355,10 +458,18 @@
                 <h3>暂无对话数据</h3>
                 <p>请在上方文本框中粘贴对话的JSON数据</p>
             </div>
+            </div>
         </div>
     </div>
 
     <script>
+        // 初始化Monaco Editor
+        let monaco;
+        require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs' } });
+        require(['vs/editor/editor.main'], function(monacoEditor) {
+            monaco = monacoEditor;
+        });
+
         const conversationInput = document.getElementById('conversationInput');
         const parseButton = document.getElementById('parseButton');
         const errorContainer = document.getElementById('errorContainer');
@@ -367,6 +478,8 @@
         const messagesList = document.getElementById('messagesList');
         const messageCount = document.getElementById('messageCount');
         const statsContainer = document.getElementById('statsContainer');
+        const sidebar = document.getElementById('sidebar');
+        const outlineList = document.getElementById('outlineList');
 
         parseButton.addEventListener('click', parseConversation);
 
@@ -408,12 +521,18 @@
             conversationContainer.style.display = 'block';
             emptyState.style.display = 'none';
 
+            // 显示侧边栏
+            sidebar.classList.add('visible');
+
             // 更新消息计数
             messageCount.textContent = `${messages.length} 条消息`;
 
             // 计算统计信息
             const stats = calculateStats(messages);
             displayStats(stats);
+
+            // 生成大纲
+            generateOutline(messages);
 
             // 清空并重新填充消息列表
             messagesList.innerHTML = '';
@@ -469,6 +588,51 @@
             statsContainer.innerHTML = statsHtml;
         }
 
+        function generateOutline(messages) {
+            outlineList.innerHTML = '';
+
+            messages.forEach((message, index) => {
+                const listItem = document.createElement('li');
+                listItem.className = 'outline-item';
+
+                const link = document.createElement('div');
+                link.className = 'outline-link';
+                link.dataset.messageIndex = index;
+
+                const number = document.createElement('span');
+                number.className = 'outline-number';
+                number.textContent = index + 1;
+
+                const role = document.createElement('span');
+                role.className = 'outline-role';
+                role.textContent = getRoleDisplayName(message.role || 'unknown');
+
+                link.appendChild(number);
+                link.appendChild(role);
+                listItem.appendChild(link);
+                outlineList.appendChild(listItem);
+
+                // 添加点击事件
+                link.addEventListener('click', () => {
+                    scrollToMessage(index);
+                    
+                    // 更新激活状态
+                    document.querySelectorAll('.outline-link').forEach(l => l.classList.remove('active'));
+                    link.classList.add('active');
+                });
+            });
+        }
+
+        function scrollToMessage(index) {
+            const messageElements = document.querySelectorAll('.message');
+            if (messageElements[index]) {
+                messageElements[index].scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+        }
+
         function createMessageElement(message, index) {
             const messageDiv = document.createElement('div');
             const role = message.role || 'unknown';
@@ -481,7 +645,7 @@
             
             const roleBadge = document.createElement('span');
             roleBadge.className = `role-badge role-${role}`;
-            roleBadge.textContent = getRoleDisplayName(role);
+            roleBadge.textContent = getRoleDisplayName(role+"\t"+(index+1));
             
             headerDiv.appendChild(roleBadge);
 
@@ -491,7 +655,20 @@
             
             // 处理不同类型的消息内容
             if (typeof message.content === 'string') {
-                contentDiv.textContent = message.content;
+                // 如果是字符串且看起来像JSON，使用Monaco Editor
+                // if (isJsonLike(message.content)) {
+                    const editorDiv = document.createElement('div');
+                    editorDiv.className = 'message-editor';
+                    editorDiv.style.height = '200px';
+                    contentDiv.appendChild(editorDiv);
+                    
+                    // 延迟创建Monaco Editor
+                    setTimeout(() => {
+                        createMonacoEditor(editorDiv, message.content, 'json');
+                    }, 100);
+                // } else {
+                //     contentDiv.textContent = message.content;
+                // }
             } else if (Array.isArray(message.content)) {
                 // 处理多媒体内容
                 message.content.forEach(item => {
@@ -508,9 +685,15 @@
                     }
                 });
             } else if (message.content && typeof message.content === 'object') {
-                contentDiv.textContent = JSON.stringify(message.content, null, 2);
-                contentDiv.style.fontFamily = 'Monaco, Menlo, Ubuntu Mono, monospace';
-                contentDiv.style.fontSize = '0.9rem';
+                // 对象内容使用Monaco Editor展示JSON
+                const editorDiv = document.createElement('div');
+                editorDiv.className = 'message-editor';
+                editorDiv.style.height = '200px';
+                contentDiv.appendChild(editorDiv);
+                
+                setTimeout(() => {
+                    createMonacoEditor(editorDiv, JSON.stringify(message.content, null, 2), 'json');
+                }, 100);
             } else {
                 contentDiv.textContent = '无内容';
                 contentDiv.style.fontStyle = 'italic';
@@ -553,12 +736,28 @@
                 if (toolCall.function?.arguments) {
                     try {
                         const args = JSON.parse(toolCall.function.arguments);
-                        contentDiv.textContent = JSON.stringify(args, null, 2);
+                        const editorDiv = document.createElement('div');
+                        editorDiv.style.height = '150px';
+                        editorDiv.style.border = '1px solid #e5e7eb';
+                        editorDiv.style.borderRadius = '4px';
+                        contentDiv.appendChild(editorDiv);
+                        
+                        setTimeout(() => {
+                            createMonacoEditor(editorDiv, JSON.stringify(args, null, 2), 'json');
+                        }, 100);
                     } catch {
                         contentDiv.textContent = toolCall.function.arguments;
                     }
                 } else {
-                    contentDiv.textContent = JSON.stringify(toolCall, null, 2);
+                    const editorDiv = document.createElement('div');
+                    editorDiv.style.height = '150px';
+                    editorDiv.style.border = '1px solid #e5e7eb';
+                    editorDiv.style.borderRadius = '4px';
+                    contentDiv.appendChild(editorDiv);
+                    
+                    setTimeout(() => {
+                        createMonacoEditor(editorDiv, JSON.stringify(toolCall, null, 2), 'json');
+                    }, 100);
                 }
 
                 toolDiv.appendChild(headerDiv);
@@ -590,6 +789,54 @@
         function clearError() {
             errorContainer.innerHTML = '';
         }
+
+        function createMonacoEditor(container, content, language) {
+            if (!monaco) {
+                // Fallback if Monaco is not loaded
+                container.innerHTML = `<pre style="margin: 0; padding: 10px; background: #f9fafb; overflow: auto; white-space: pre-wrap;">${content}</pre>`;
+                return;
+            }
+
+            try {
+                const editor = monaco.editor.create(container, {
+                    value: content,
+                    language: language,
+                    theme: 'vs-light',
+                    readOnly: true,
+                    minimap: { enabled: false },
+                    scrollBeyondLastLine: false,
+                    automaticLayout: true,
+                    fontSize: 13,
+                    lineNumbers: 'on',
+                    wordWrap: 'on',
+                    folding: true,
+                    glyphMargin: false,
+                    lineDecorationsWidth: 0,
+                    lineNumbersMinChars: 3,
+                    overviewRulerLanes: 0,
+                    scrollbar: {
+                        vertical: 'auto',
+                        horizontal: 'auto',
+                        verticalScrollbarSize: 10,
+                        horizontalScrollbarSize: 10
+                    }
+                });
+                
+                // Store editor reference for cleanup if needed
+                container._monacoEditor = editor;
+            } catch (error) {
+                console.error('Failed to create Monaco editor:', error);
+                // Fallback
+                container.innerHTML = `<pre style="margin: 0; padding: 10px; background: #f9fafb; overflow: auto; white-space: pre-wrap;">${content}</pre>`;
+            }
+        }
+
+        // function isJsonLike(str) {
+        //     if (!str || typeof str !== 'string') return false;
+        //     const trimmed = str.trim();
+        //     return (trimmed.startsWith('{') && trimmed.endsWith('}')) || 
+        //            (trimmed.startsWith('[') && trimmed.endsWith(']'));
+        // }
 
         // 自动尝试解析粘贴的内容
         conversationInput.addEventListener('paste', function(e) {
