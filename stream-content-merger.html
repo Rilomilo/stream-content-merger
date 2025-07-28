@@ -210,6 +210,7 @@
             try {
                 const lines = inputData.split('\n');
                 const contentParts = [];
+                const toolCallsInfo = {};
                 let totalLines = lines.length;
                 let contentLines = 0;
                 
@@ -219,10 +220,49 @@
                             const jsonStr = line.substring(6); // 移除 'data: ' 前缀
                             const jsonData = JSON.parse(jsonStr);
                             
-                            if (jsonData.choices && jsonData.choices[0] && jsonData.choices[0].delta && jsonData.choices[0].delta.content) {
-                                const content = jsonData.choices[0].delta.content;
-                                contentParts.push(content);
-                                contentLines++;
+                            if (jsonData.choices && jsonData.choices[0] && jsonData.choices[0].delta) {
+                                const delta = jsonData.choices[0].delta;
+                                
+                                // 提取content内容
+                                if (delta.content) {
+                                    contentParts.push(delta.content);
+                                    contentLines++;
+                                }
+                                
+                                // 提取工具调用的完整信息
+                                if (delta.tool_calls && delta.tool_calls[0]) {
+                                    const toolCall = delta.tool_calls[0];
+                                    const index = toolCall.index || 0;
+                                    
+                                    // 初始化工具调用信息
+                                    if (!toolCallsInfo[index]) {
+                                        toolCallsInfo[index] = {
+                                            id: '',
+                                            type: '',
+                                            function: {
+                                                name: '',
+                                                arguments: ''
+                                            }
+                                        };
+                                    }
+                                    
+                                    // 累积工具调用信息
+                                    if (toolCall.id) {
+                                        toolCallsInfo[index].id = toolCall.id;
+                                    }
+                                    if (toolCall.type) {
+                                        toolCallsInfo[index].type = toolCall.type;
+                                    }
+                                    if (toolCall.function) {
+                                        if (toolCall.function.name) {
+                                            toolCallsInfo[index].function.name = toolCall.function.name;
+                                        }
+                                        if (toolCall.function.arguments) {
+                                            toolCallsInfo[index].function.arguments += toolCall.function.arguments;
+                                        }
+                                    }
+                                    contentLines++;
+                                }
                             }
                         } catch (e) {
                             // 忽略解析错误的行
@@ -231,8 +271,19 @@
                     }
                 }
                 
+                // 将工具调用信息添加到内容中
+                for (const [index, toolCall] of Object.entries(toolCallsInfo)) {
+                    if (toolCall.function.name || toolCall.function.arguments) {
+                        contentParts.push('\n\n=== 工具调用信息 ===\n');
+                        contentParts.push(`工具ID: ${toolCall.id}\n`);
+                        contentParts.push(`工具类型: ${toolCall.type}\n`);
+                        contentParts.push(`工具名称: ${toolCall.function.name}\n`);
+                        contentParts.push(`工具参数:\n${toolCall.function.arguments}\n`);
+                    }
+                }
+                
                 if (contentParts.length === 0) {
-                    showError('未找到任何content内容！');
+                    showError('未找到任何content或tool_calls内容！');
                     return;
                 }
                 
@@ -261,13 +312,23 @@
         }
         
         function loadSampleData() {
-            const sampleData = window.fs ? '' : `data: {"choices":[{"index":0,"delta":{"content":"\\u003cthinking","role":"assistant"}}],"created":1752543355,"id":"msg_01F77ki7nLQKHyu2Tjt82dgc","model":"claude-sonnet-4"}
+            const sampleData = window.fs ? '' : `data: {"choices":[{"index":0,"delta":{"content":"我将删除所有文","role":"assistant"}}],"created":1753676347,"id":"msg_vrtx_01DRBgKdseMXsJNXu2C3571T","model":"claude-sonnet-4"}
 
-data: {"choices":[{"index":0,"delta":{"content":"\\u003e\\n用户要求计算828392+","role":"assistant"}}],"created":1752543355,"id":"msg_01F77ki7nLQKHyu2Tjt82dgc","model":"claude-sonnet-4"}
+data: {"choices":[{"index":0,"delta":{"content":"件中的暗","role":"assistant"}}],"created":1753676347,"id":"msg_vrtx_01DRBgKdseMXsJNXu2C3571T","model":"claude-sonnet-4"}
 
-data: {"choices":[{"index":0,"delta":{"content":"8939293的结果。我看","role":"assistant"}}],"created":1752543355,"id":"msg_01F77ki7nLQKHyu2Tjt82dgc","model":"claude-sonnet-4"}
+data: {"choices":[{"index":0,"delta":{"content":"色(dark)样","role":"assistant"}}],"created":1753676347,"id":"msg_vrtx_01DRBgKdseMXsJNXu2C3571T","model":"claude-sonnet-4"}
 
-data: {"choices":[{"index":0,"delta":{"content":"到在连接的MCP服务器中","role":"assistant"}}],"created":1752543355,"id":"msg_01F77ki7nLQKHyu2Tjt82dgc","model":"claude-sonnet-4"}
+data: {"choices":[{"index":0,"delta":{"content":"式。让","role":"assistant"}}],"created":1753676347,"id":"msg_vrtx_01DRBgKdseMXsJNXu2C3571T","model":"claude-sonnet-4"}
+
+data: {"choices":[{"index":0,"delta":{"content":"我逐个处","role":"assistant"}}],"created":1753676347,"id":"msg_vrtx_01DRBgKdseMXsJNXu2C3571T","model":"claude-sonnet-4"}
+
+data: {"choices":[{"index":0,"delta":{"content":"理这些文件。","role":"assistant"}}],"created":1753676347,"id":"msg_vrtx_01DRBgKdseMXsJNXu2C3571T","model":"claude-sonnet-4"}
+
+data: {"choices":[{"index":0,"delta":{"content":null,"tool_calls":[{"function":{"name":"replace_string_in_file"},"id":"toolu_vrtx_01R5EJWRVUyQuSM4J3RJdJST","index":0,"type":"function"}]}}],"created":1753676347,"id":"msg_vrtx_01DRBgKdseMXsJNXu2C3571T","model":"claude-sonnet-4"}
+
+data: {"choices":[{"index":0,"delta":{"content":null,"tool_calls":[{"function":{"arguments":"{\\"explanation\\""},"index":0}]}}],"created":1753676348,"id":"msg_vrtx_01DRBgKdseMXsJNXu2C3571T","model":"claude-sonnet-4"}
+
+data: {"choices":[{"index":0,"delta":{"content":null,"tool_calls":[{"function":{"arguments":": \\"删除SquareServerDetail.tsx中的所有暗色样式\\", \\"filePath\\": \\"c:\\\\\\\\Users\\\\\\\\Rilomilo\\\\\\\\Desktop\\\\\\\\mcphub\\\\\\\\frontend\\\\\\\\src\\\\\\\\components\\\\\\\\SquareServerDetail.tsx\\", \\"oldString\\": \\"        <div className=\\\\\\"flex items-center text-gray-600 dark:text-gray-400\\\\\\">\\\\n                    <svg className=\\\\\\"w-4 h-4 mr-2 text-gray-500\\\\\\" fill=\\\\\\"currentColor\\\\\\" viewBox=\\\\\\"0 0 20 20\\\\\\">\\\\n                        <path fillRule=\\\\\\"evenodd\\\\\\" d=\\\\\\"M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z\\\\\\" clipRule=\\\\\\"evenodd\\\\\\" />\\\\n                    </svg>\\\\n                    <code className=\\\\\\"text-sm font-mono bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-gray-800 dark:text-gray-200\\\\\\">\\\\n                        {server.name}\\\\n                    </code>\\\\n                </div>\\\\n                <div className=\\\\\\"flex items-center text-gray-600 dark:text-gray-400\\\\\\">\\\\n                    <svg className=\\\\\\"w-4 h-4 mr-2 text-gray-500\\\\\\" fill=\\\\\\"currentColor\\\\\\" viewBox=\\\\\\"0 0 20 20\\\\\\">\\\\n                        <path fillRule=\\\\\\"evenodd\\\\\\" d=\\\\\\"M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z\\\\\\" clipRule=\\\\\\"evenodd\\\\\\" />\\\\n                    </svg>\\\\n                    <span className=\\\\\\"text-sm font-medium\\\\\\">\\\\n                        {t('market.author')}: <span className=\\\\\\"text-gray-900 dark:text-white\\\\\\">{server.author.name}</span>\\\\n                    </span>\\\\n                </div>\\", \\"newString\\": \\"                <div className=\\\\\\"flex items-center text-gray-600\\\\\\">\\\\n                    <svg className=\\\\\\"w-4 h-4 mr-2 text-gray-500\\\\\\" fill=\\\\\\"currentColor\\\\\\" viewBox=\\\\\\"0 0 20 20\\\\\\">\\\\n                        <path fillRule=\\\\\\"evenodd\\\\\\" d=\\\\\\"M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z\\\\\\" clipRule=\\\\\\"evenodd\\\\\\" />\\\\n                    </svg>\\\\n                    <code className=\\\\\\"text-sm font-mono bg-gray-100 px-2 py-1 rounded text-gray-800\\\\\\">\\\\n                        {server.name}\\\\n                    </code>\\\\n                </div>\\\\n                <div className=\\\\\\"flex items-center text-gray-600\\\\\\">\\\\n                    <svg className=\\\\\\"w-4 h-4 mr-2 text-gray-500\\\\\\" fill=\\\\\\"currentColor\\\\\\" viewBox=\\\\\\"0 0 20 20\\\\\\">\\\\n                        <path fillRule=\\\\\\"evenodd\\\\\\" d=\\\\\\"M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z\\\\\\" clipRule=\\\\\\"evenodd\\\\\\" />\\\\n                    </svg>\\\\n                    <span className=\\\\\\"text-sm font-medium\\\\\\">\\\\n                        {t('market.author')}: <span className=\\\\\\"text-gray-900\\\\\\">{server.author.name}</span>\\\\n                    </span>\\\\n                </div>\\"}"},"index":0}]}}],"created":1753676359,"id":"msg_vrtx_01DRBgKdseMXsJNXu2C3571T","model":"claude-sonnet-4"}
 
 data: [DONE]`;
             
